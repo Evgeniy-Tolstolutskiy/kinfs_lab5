@@ -1,0 +1,578 @@
+/* creating tables */
+
+create table Aircrafts(
+	id number(4) NOT NULL PRIMARY KEY,
+	model varchar2(20)
+)
+PCTFREE 10
+PCTUSED 60
+STORAGE (INITIAL 7K
+NEXT 7K
+PCTINCREASE 0
+MAXEXTENTS 10);
+
+create table Pilots(
+	id number(4) NOT NULL PRIMARY KEY,
+	name varchar2(20),
+	age number(4),
+	aircraftId number(4),
+	constraint fk_Pilots_Aircrafts
+	FOREIGN KEY (aircraftId)
+    REFERENCES Aircrafts (id)
+)
+PCTFREE 10
+PCTUSED 60
+STORAGE (INITIAL 7K
+NEXT 7K
+PCTINCREASE 0
+MAXEXTENTS 10);
+
+create table Routs(
+	id number(4) NOT NULL PRIMARY KEY,
+	"from" varchar2(20),
+	"to" varchar2(20)
+)
+PCTFREE 10
+PCTUSED 60
+STORAGE (INITIAL 7K
+NEXT 7K
+PCTINCREASE 0
+MAXEXTENTS 10);
+
+create table Scedule(
+	id number(4) NOT NULL PRIMARY KEY,
+	aircraftId number(4),
+	routId number(4),
+	"date" date,
+	constraint fk_Schedule_Aircrafts
+	FOREIGN KEY (aircraftId)
+    REFERENCES Aircrafts (id),
+	constraint fk_Schedule_Routs
+	FOREIGN KEY (routId)
+    REFERENCES Routs (id)
+)
+PCTFREE 10
+PCTUSED 60
+STORAGE (INITIAL 7K
+NEXT 7K
+PCTINCREASE 0
+MAXEXTENTS 10);
+
+create table Bookings(
+	id number(4) NOT NULL PRIMARY KEY,
+	scheduleId number(4),
+	seatNumber number(4),
+	cost binary_double,
+	constraint fk_Bookings_Schedule
+	FOREIGN KEY (scheduleId)
+    REFERENCES Scedule (id)
+)
+PCTFREE 10
+PCTUSED 60
+STORAGE (INITIAL 7K
+NEXT 7K
+PCTINCREASE 0
+MAXEXTENTS 10);
+
+create table PriceList(
+	id number(4) NOT NULL PRIMARY KEY,
+	aircraftId number(4),
+	classA binary_double,
+	classB binary_double,
+	classC binary_double,
+	constraint fk_PriceList_Aircrafts
+	FOREIGN KEY (aircraftId)
+    REFERENCES Aircrafts (id)
+)
+PCTFREE 10
+PCTUSED 60
+STORAGE (INITIAL 7K
+NEXT 7K
+PCTINCREASE 0
+MAXEXTENTS 10);
+
+/* filling tables */
+
+insert into Aircrafts values(1, 'BOEING 747');
+insert into Aircrafts values(2, 'BOEING 747B');
+
+insert into Pilots values(1, 'Andrew Jackson', 52, 1);
+insert into Pilots values(2, 'Peter Davidson', 32, 1);
+insert into Pilots values(3, 'Jack Harrisson', 47, 2);
+insert into Pilots values(4, 'Michael Starr', 28, 2);
+
+insert into Routs values(1, 'London', 'Paris');
+insert into Routs values(2, 'London', 'Boston');
+insert into Routs values(3, 'London', 'Moscow');
+
+insert into Scedule values(1, 1, 1, to_date('2016/09/30 12:00', 'yyyy/mm/dd HH24:mi'));
+insert into Scedule values(2, 1, 2, to_date('2016/10/02 14:50', 'yyyy/mm/dd HH24:mi'));
+insert into Scedule values(3, 2, 3, to_date('2016/09/30 13:30', 'yyyy/mm/dd HH24:mi'));
+
+insert into Bookings values(1, 1, 1, 250.15);
+insert into Bookings values(2, 1, 2, 250.15);
+insert into Bookings values(3, 1, 3, 220.90);
+
+insert into PriceList values(1, 1, 200.0, 180.0, 160.0);
+insert into PriceList values(2, 2, 210.0, 185.0, 165.0);
+
+/* select some meta information about table Aircrafts */
+SELECT TABLESPACE_NAME, PCT_FREE, PCT_USED, INITIAL_EXTENT, NEXT_EXTENT, MIN_EXTENTS, MAX_EXTENTS, PCT_INCREASE FROM USER_TABLES WHERE TABLE_NAME='AIRCRAFTS';
+
+/* creating pl/sql index on table Aircrafts */
+CREATE INDEX PILOTS_NAME_IND ON Pilots (NAME); 
+
+/* function that returns count of pilots, whos age is less than average age of all pilots */
+CREATE OR REPLACE FUNCTION LESS_THAN_AVG RETURN INTEGER AS 
+ROW_COUNT INTEGER;
+BEGIN
+	SELECT COUNT(*) INTO ROW_COUNT FROM Pilots
+	WHERE age >
+(SELECT AVG(age) FROM Pilots);
+RETURN ROW_COUNT;
+END LESS_THAN_AVG;
+
+/* function that returns the oldest pilot for some aircraft */
+create or replace function THE_OLDEST_PILOT_FOR_MODEL (model1 varchar2) return varchar2 as
+PILOT_NAME varchar2(20);
+begin
+	select max(name) into PILOT_NAME from Pilots p, Aircrafts a
+	where p.aircraftId = a.id and a.model like model1||'%' and age = 
+	(select max(age) from Pilots p, Aircrafts a
+	where p.aircraftId = a.id and a.model like model1||'%');
+return PILOT_NAME;
+end THE_OLDEST_PILOT_FOR_MODEL;
+
+
+/* procedure of inserting aircraft and sequence for it */
+create sequence aircraft_seq start with 3;
+
+create or replace procedure insert_aircraft (new_name varchar2) as
+begin
+insert into Aircrafts values (aircraft_seq.NEXTVAL, new_name);
+end insert_aircraft;
+
+/* procedure of inserting booking and sequence for it */
+create sequence booking_seq start with 10;
+
+create or replace procedure insert_booking (sc_id number, sNumber number, cost binary_double) as
+begin
+insert into Bookings values (booking_seq.NEXTVAL, sc_id, sNumber, cost);
+end insert_booking;
+
+/* procedure of inserting pilot and sequence for it */
+create sequence pilot_seq start with 10;
+
+create or replace procedure insert_pilot (name varchar2, age number, air_id number) as
+begin
+insert into Pilots values (pilot_seq.NEXTVAL, name, age, air_id);
+end insert_pilot;
+
+/* procedure of inserting pricelist and sequence for it */
+create sequence pricelist_seq start with 10;
+
+create or replace procedure insert_pricelist (air_id number, clA varchar2, clB varchar2, clC varchar2) as
+begin
+insert into PriceList values (pricelist_seq.NEXTVAL, air_id, clA, clB, clC);
+end insert_pricelist;
+
+/* procedure of inserting route and sequence for it */
+create sequence rout_seq start with 10;
+
+create or replace procedure insert_rout ("from" varchar2, "to" varchar2) as
+begin
+insert into Routs values (rout_seq.NEXTVAL, "from", "to");
+end insert_rout;
+
+/* procedure of inserting schedule and sequence for it */
+create sequence scedule_seq start with 10;
+
+create or replace procedure insert_scedule (air_id number, rout_id number, "date" date) as
+begin
+insert into Scedule values (scedule_seq.NEXTVAL, air_id, rout_id, "date");
+end insert_scedule;
+
+/* inserting aircraft with procedure */
+exec insert_aircraft('some plain');
+
+/* table for storing list of pilots for each aircraft */
+create table list_pilots(
+aircraft_id number,
+list_of_pilots varchar2(50));
+
+/* procedure that fills table list_pilots */
+create or replace procedure pilots_list as
+cursor l_aircrafts is
+select id from Aircrafts;
+cursor l_pilots(a_id number) is
+select name from Pilots where aircraftId = a_id;
+aircraft_id Aircrafts.id%TYPE;
+pilot_name Pilots.name%TYPE;
+list_p varchar(50):='';
+begin
+delete from list_pilots;
+if l_aircrafts%isopen then close l_aircrafts;
+end if;
+open l_aircrafts;
+loop
+fetch l_aircrafts into aircraft_id;
+exit when l_aircrafts%NOTFOUND;
+open l_pilots(aircraft_id);
+list_p:='';
+loop
+fetch l_pilots into pilot_name;
+exit when l_pilots%NOTFOUND;
+list_p:=list_p||pilot_name||';' ;
+end loop;
+close l_pilots;
+insert into list_pilots values(aircraft_id, list_p);
+end loop;
+close l_aircrafts;
+commit;
+end;
+
+/* table for storing schedule in user-friendly format */
+create table result(
+aircraft varchar2(20),
+pilots varchar2(50),
+"from" varchar2(20),
+"to" varchar2(20),
+"date" date);
+
+/* anonymous block that fills table result */
+declare
+Res varchar2(50);
+N1 Aircrafts.model%TYPE;
+N2 Aircrafts.id%TYPE;
+N3 Routs."from"%TYPE;
+N4 Routs."to"%TYPE;
+N5 Scedule."date"%TYPE;
+cursor C11 is select distinct A.model, A.id, R."from", R."to", S."date" from Aircrafts A, Routs R, Scedule S where S.aircraftId = A.id and S.routId = R.id;
+cursor C12(a_id number) is select list_of_pilots from list_pilots where aircraft_id = a_id;
+begin
+if C11%isopen then close C11;
+end if;
+open C11;
+loop
+fetch C11 into N1, N2, N3, N4, N5;
+exit when C11%NOTFOUND;
+open C12(N2);
+fetch C12 into Res;
+exit when C12%NOTFOUND;
+insert into result values(N1, Res, N3, N4, N5);
+close C12;
+end loop;
+close C11;
+commit;
+end;
+
+/* creating package with optional data */
+CREATE PACKAGE opt_data IS 
+min_quant CONSTANT INTEGER := 10; 
+max_volume REAL:=1000.00; 
+not_type_storage EXCEPTION; 
+END opt_data; 
+
+/* table for auditing */
+CREATE TABLE AUDIT_PI_EXC (
+Num_pp NUMBER (5) NOT NULL PRIMARY KEY,
+User_name VARCHAR2(20),
+Date_in VARCHAR2(25),
+Table_Name VARCHAR2(20),
+Terminal VARCHAR2(20));
+
+/* procedure for inserting aircraft with exception handling */
+CREATE SEQUENCE PI_exc;
+
+CREATE OR REPLACE PROCEDURE ADD_AIRCRAFTS 
+(Name1 VARCHAR2) AS
+Not_Terminal EXCEPTION;
+Not_User EXCEPTION;
+Term Varchar2(20);
+BEGIN
+Term:=USERENV('TERMINAL');
+IF Term<>'WS-165-1-1' THEN RAISE Not_Terminal;
+ELSIF USER<>'SCOTT' THEN RAISE Not_User;
+END IF;
+INSERT INTO Aircrafts VALUES 
+(aircraft_seq.nextval, Name1);
+COMMIT;
+EXCEPTION
+WHEN Not_Terminal OR Not_User THEN 
+	INSERT INTO AUDIT_PI_EXC VALUES
+	(PI_exc.nextval, USER, TO_Char(Sysdate, 'DD: MM: YY: hh: mm: ss'), 'Aircrafts', Term); 
+COMMIT;
+END;
+
+/* procedure for changing pilots age with exception handling */
+create or replace procedure ChangePilotsAge(P_name varchar2, new_age number) as
+P_id Pilots.id%TYPE;
+Small_age exception;
+Big_age exception;
+begin
+select id into P_id from Pilots where Upper(name) like '%'||Upper(P_name)||'%' and rownum=1;
+if(new_age > 60) then raise Big_age;
+elsif(new_age < 20) then raise Small_age;
+end if;
+update Pilots set age = new_age where id = P_id;
+commit;
+exception
+when Big_age then
+Raise_application_error(-20003, 'Big age');
+when Small_age then
+Raise_application_error(-20002, 'Small age');
+WHEN NO_DATA_FOUND THEN
+Raise_application_error (-20001, 'No such pilot');
+end;
+
+/* table for auditing of changing ticket price */
+create table BadBookPriceChange(
+Book_id NUMBER(5) NOT NULL PRIMARY KEY,
+BOOKING_id NUMBER(4),
+cost binary_double,
+Date_change DATE,
+Operator VARCHAR2(20));
+
+/* procedure for changing ticket price with exception handling */
+create sequence book_cur;
+
+create or replace procedure change_booked_ticket_price(booking_id number, new_price binary_double) is
+Old_price binary_double;
+Bad_price_change exception;
+cursor CUR(b_id number) is select cost from Bookings where id = b_id;
+begin
+open CUR(booking_id);
+loop
+fetch CUR into Old_price;
+exit when CUR%NOTFOUND;
+end loop;
+close CUR;
+if(new_price < (Old_price*0.8)) then
+raise Bad_price_change;
+end if;
+update Bookings set cost = new_price where id = booking_id;
+exception
+when Bad_price_change then
+insert into BadBookPriceChange values(book_cur.NEXTVAL, booking_id, new_price, SYSDATE, USER);
+end change_booked_ticket_price;
+
+/* creating package definition with our functions and procedures */
+create or replace package labs is
+FUNCTION LESS_THAN_AVG return integer;
+function THE_OLDEST_PILOT_FOR_MODEL (model1 varchar2) return varchar2;
+procedure pilots_list;
+procedure ChangePilotsAge(P_name varchar2, new_age number);
+end labs;
+
+/* declaring package body */
+create or replace package body labs is
+
+FUNCTION LESS_THAN_AVG RETURN INTEGER IS 
+ROW_COUNT INTEGER;
+BEGIN
+	SELECT COUNT(*) INTO ROW_COUNT FROM Pilots
+	WHERE age >
+(SELECT AVG(age) FROM Pilots);
+RETURN ROW_COUNT;
+END LESS_THAN_AVG;
+
+function THE_OLDEST_PILOT_FOR_MODEL (model1 varchar2) return varchar2 is
+PILOT_NAME varchar2(20);
+begin
+	select max(name) into PILOT_NAME from Pilots p, Aircrafts a
+	where p.aircraftId = a.id and a.model like model1||'%' and age = 
+	(select max(age) from Pilots p, Aircrafts a
+	where p.aircraftId = a.id and a.model like model1||'%');
+return PILOT_NAME;
+end THE_OLDEST_PILOT_FOR_MODEL;
+
+procedure pilots_list is
+cursor l_aircrafts is
+select id from Aircrafts;
+cursor l_pilots(a_id number) is
+select name from Pilots where aircraftId = a_id;
+aircraft_id Aircrafts.id%TYPE;
+pilot_name Pilots.name%TYPE;
+list_p varchar(50):='';
+begin
+delete from list_pilots;
+if l_aircrafts%isopen then close l_aircrafts;
+end if;
+open l_aircrafts;
+loop
+fetch l_aircrafts into aircraft_id;
+exit when l_aircrafts%NOTFOUND;
+open l_pilots(aircraft_id);
+list_p:='';
+loop
+fetch l_pilots into pilot_name;
+exit when l_pilots%NOTFOUND;
+list_p:=list_p||pilot_name||';' ;
+end loop;
+close l_pilots;
+insert into list_pilots values(aircraft_id, list_p);
+end loop;
+close l_aircrafts;
+commit;
+end pilots_list;
+
+procedure ChangePilotsAge(P_name varchar2, new_age number) is
+P_id Pilots.id%TYPE;
+Small_age exception;
+Big_age exception;
+begin
+select id into P_id from Pilots where Upper(name) like '%'||Upper(P_name)||'%' and rownum=1;
+if(new_age > 60) then raise Big_age;
+elsif(new_age < 20) then raise Small_age;
+end if;
+update Pilots set age = new_age where id = P_id;
+commit;
+exception
+when Big_age then
+Raise_application_error(-20003, 'Big age');
+when Small_age then
+Raise_application_error(-20002, 'Small age');
+WHEN NO_DATA_FOUND THEN
+Raise_application_error (-20001, 'No such pilot');
+end ChangePilotsAge;
+
+end labs;
+
+/* executing procedure from package */
+exec labs.pilots_list;
+
+
+/* trigger for handling cascade modifying */
+CREATE or replace TRIGGER CASCADE_MODIFY
+AFTER UPDATE ON Aircrafts FOR EACH ROW 
+BEGIN
+UPDATE Pilots SET aircraftId=:NEW.id WHERE aircraftId=:OLD.id;
+UPDATE Scedule SET aircraftId=:NEW.id WHERE aircraftId=:OLD.id;
+UPDATE PriceList SET aircraftId=:NEW.id WHERE aircraftId=:OLD.id;
+END;
+
+/* trigger for handling cascade deleting */
+CREATE or replace TRIGGER CASCADE_DELETE
+before delete ON Aircrafts FOR EACH ROW 
+BEGIN
+delete from Pilots WHERE aircraftId=:OLD.id;
+delete from Scedule WHERE aircraftId=:OLD.id;
+delete from PriceList WHERE aircraftId=:OLD.id;
+END;
+
+/* selecting trigger body for trigger CASCADE_MODIFY */
+SELECT trigger_body
+    FROM user_triggers
+    WHERE trigger_name = 'CASCADE_MODIFY';
+
+/* table for auditing */
+create sequence aud_pi;
+create table Audit_PI(
+id number(4) NOT NULL PRIMARY KEY,
+table_name varchar2(20),
+"date" varchar2(20),
+command varchar2(10)
+)
+PCTFREE 10
+PCTUSED 60
+STORAGE (INITIAL 7K
+NEXT 7K
+PCTINCREASE 0
+MAXEXTENTS 10);
+
+/* table for auditing update */
+create sequence aud_pi2;
+create table Audit_update_PI(
+id number(4) NOT NULL PRIMARY KEY,
+command_id number(4),
+field_name varchar2(20),
+"old" varchar2(20),
+"new" varchar2(20),
+constraint fk_Audit_update_PI_Audit_PI
+	FOREIGN KEY (command_id)
+    REFERENCES Audit_PI (id)
+)
+PCTFREE 10
+PCTUSED 60
+STORAGE (INITIAL 7K
+NEXT 7K
+PCTINCREASE 0
+MAXEXTENTS 10);
+
+/* trigger for auditing when table bookings is changed */
+CREATE OR REPLACE TRIGGER T1 
+AFTER DELETE OR INSERT OR UPDATE
+ON Bookings
+BEGIN
+IF deleting
+THEN INSERT INTO Audit_PI VALUES (aud_pi.NEXTVAL, 'Bookings', SYSDATE, 'DELETE');
+END IF;
+IF inserting
+THEN INSERT INTO Audit_PI VALUES (aud_pi.NEXTVAL, 'Bookings', SYSDATE, 'INSERT');
+END IF;
+IF updating 
+THEN INSERT INTO Audit_PI VALUES (aud_pi.NEXTVAL, 'Bookings', SYSDATE, 'UPDATE');
+END IF;
+END;
+
+/* trigger for auditing only when table bookings is updated */
+create or replace trigger t2 after update on Bookings for each row 
+begin
+if :NEW.id<>:OLD.id then
+INSERT INTO Audit_update_PI VALUES (aud_pi2.NEXTVAL, aud_pi.CURRVAL, 'id', :OLD.id, :NEW.id);
+end if;
+if :NEW.scheduleId<>:OLD.scheduleId then
+INSERT INTO Audit_update_PI VALUES (aud_pi2.NEXTVAL, aud_pi.CURRVAL, 'scheduleId', :OLD.scheduleId, :NEW.scheduleId);
+end if;
+if :NEW.seatNumber<>:OLD.seatNumber then
+INSERT INTO Audit_update_PI VALUES (aud_pi2.NEXTVAL, aud_pi.CURRVAL, 'seatNumber', :OLD.seatNumber, :NEW.seatNumber);
+end if;
+if :NEW.cost<>:OLD.cost then
+INSERT INTO Audit_update_PI VALUES (aud_pi2.NEXTVAL, aud_pi.CURRVAL, 'cost', :OLD.cost, :NEW.cost);
+end if;
+end;
+
+/* trigger for auditing when table aircrafts is changed with exception handling */
+CREATE or REPLACE TRIGGER aircrafts_work 
+BEFORE INSERT OR DELETE OR UPDATE ON Aircrafts 
+DECLARE 
+not_on_weekends EXCEPTION; 
+non_working_hours EXCEPTION; 
+BEGIN 
+IF ((To_char(sysdate, 'DY') = '��') OR (To_char(sysdate, 'DY') = 'SUN')) THEN 
+RAISE not_on_weekends; 
+END IF; 
+IF ((To_char(sysdate, 'HH24') < 20) OR (To_char(sysdate, 'HH24') > 15)) THEN 
+RAISE non_working_hours; 
+END IF; 
+EXCEPTION 
+WHEN not_on_weekends THEN 
+raise_application_error (-20324, 'May not change aircrafts info during the weekend'); 
+WHEN non_working_hours THEN 
+raise_application_error (-20326, 'May not change aircrafts info during non-working hours'); 
+END;
+
+/* table for storing deleted bookings */
+create table DeletedBookings(
+id number(4) NOT NULL PRIMARY KEY,
+booking_id number(4),
+scheduleId number(4),
+seatNumber number(4),
+cost binary_double)
+PCTFREE 10
+PCTUSED 60
+STORAGE (INITIAL 7K
+NEXT 7K
+PCTINCREASE 0
+MAXEXTENTS 10);
+
+/* trigger for storing deleted bookings */
+create sequence deleted_booking;
+create sequence deleted_booking2;
+
+create or replace trigger log_one_of_two_bookings before delete on Bookings for each row
+begin
+if mod(deleted_booking.nextval, 2) = 0 then
+insert into DeletedBookings values(deleted_booking2.nextval, :old.id, :old.scheduleId, :old.seatNumber, :old.cost);
+end if;
+end;
